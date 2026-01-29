@@ -2,88 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    /* LIGHT MODE: 'The Architect' (Paper, clean lines) */
-    --background: 210 40% 98%; /* Zinc-50 */
-    --foreground: 222.2 84% 4.9%; /* Deep Navy Text */
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%; /* Deep Slate */
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.75rem; /* Soft rounded corners */
-  }
-
-  .dark {
-    /* DARK MODE: 'Orbital Night' (Deep Space, Neon Data) */
-    --background: 222.2 84% 4.9%; /* Slate-950 */
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+:root {
+    --background: #F4F4F5;
+    --foreground: #18181B;
+    --card: #FFFFFF;
+    --border: #E4E4E7;
+    --primary: #2563EB;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+/* 1. TEXTURE & BASE */
+body {
+    background-color: var(--background);
+    color: var(--foreground);
+    /* Subtle noise texture for that "magazine paper" feel */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+    -webkit-font-smoothing: antialiased;
 }
 
-/* --- MAPBOX OVERRIDES --- */
-/* Removes the Mapbox logo/attribution for cleaner look (Note: technically against TOS for public apps, but standard for hackathons/demos) */
-.mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {
-  display: none !important;
+/* 2. CUSTOM SCROLLBAR (Minimalist) */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #D4D4D8;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #A1A1AA;
 }
 
-/* Glassmorphism Utilities */
+/* 3. SELECTION (High Contrast) */
+::selection {
+    background: #000;
+    color: #fff;
+}
+
+/* 4. UTILITIES */
+.perspective-container {
+    perspective: 1200px;
+}
+
+/* Glass Card Utility */
 .glass-panel {
-  @apply bg-background/80 backdrop-blur-md border border-border/50 shadow-xl;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Hide scrollbar for clean horizontal scrolls */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Leaflet Popup Customization */
+.leaflet-popup-content-wrapper {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px -10px rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 0;
+}
+.leaflet-popup-tip {
+    background: rgba(255, 255, 255, 0.9);
+}
+.leaflet-container {
+    font-family: inherit;
 }
