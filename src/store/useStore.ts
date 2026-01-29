@@ -1,4 +1,3 @@
-// src/store/useStore.ts
 import { create } from 'zustand';
 import { Material, MATERIALS, DEFAULT_ROOF, DEFAULT_GROUND } from '@/lib/materials';
 
@@ -20,6 +19,7 @@ interface AppState {
     setGroundMaterial: (materialId: string) => void;
     toggleTheme: () => void;
     setTargetArea: (area: number) => void;
+    setTab: (tab: 'map' | 'blueprint') => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -44,4 +44,5 @@ export const useStore = create<AppState>((set) => ({
 
     toggleTheme: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
     setTargetArea: (area) => set({ targetArea: area }),
+    setTab: (tab) => set({ activeTab: tab }),
 }));

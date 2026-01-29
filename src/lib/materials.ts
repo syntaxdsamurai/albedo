@@ -1,5 +1,3 @@
-// src/lib/materials.ts
-
 export type MaterialCategory = 'roof' | 'ground';
 
 export interface Material {
