@@ -5,7 +5,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Navigation, Plus, Minus, X } from "lucide-react";
 import { useTheme } from "next-themes";
-import SearchOverlay from "./SearchOverlay";
+// Remove SearchOverlay import from here since we moved it to page.tsx
+// import SearchOverlay from "./SearchOverlay";
 
 // --- 1. CONFIGURATION ---
 const INITIAL_VIEW = { lng: 77.2167, lat: 28.6315, zoom: 11 };
@@ -20,7 +21,7 @@ const HUBS = [
     { name: "Dwarka Sec-21", lat: 28.5887, lng: 77.0426 }
 ];
 
-// --- 2. COLONY GENERATOR (Unchanged) ---
+// --- 2. COLONY GENERATOR ---
 const generateCityData = () => {
     const features: any[] = [];
     const BUILDING_COUNT = 80;
@@ -87,12 +88,14 @@ const generateCityData = () => {
 
 const CITY_DATA = generateCityData();
 
-// --- PROPS INTERFACE ---
+// --- 3. PROPS INTERFACE UPDATE ---
 interface RealMapProps {
-    activeLayers: string[]; // <--- THIS IS NEW
+    activeLayers: string[];
+    // Fix: Add targetLocation prop definition
+    targetLocation?: [number, number] | null;
 }
 
-export default function RealMap({ activeLayers }: RealMapProps) {
+export default function RealMap({ activeLayers, targetLocation }: RealMapProps) {
     const { resolvedTheme } = useTheme();
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
@@ -225,19 +228,23 @@ export default function RealMap({ activeLayers }: RealMapProps) {
     }, [resolvedTheme]);
 
     // 2. LIVE FILTERING EFFECT
-    // This runs whenever activeLayers changes, WITHOUT reloading the map
     useEffect(() => {
         if (!map.current || !map.current.getLayer('3d-buildings')) return;
-
-        // Show Standard buildings OR buildings in the active list
         const filter: any = ['any', ['==', 'type', 'standard'], ['in', 'type', ...activeLayers]];
         map.current.setFilter('3d-buildings', filter);
-
     }, [activeLayers]);
 
-    const flyToCoords = (lat: number, lng: number) => {
-        map.current?.flyTo({ center: [lng, lat], zoom: 16.5, pitch: 60, duration: 2000 });
-    };
+    // 3. TARGET LOCATION FLYTO (The New Logic)
+    useEffect(() => {
+        if (!map.current || !targetLocation) return;
+
+        map.current.flyTo({
+            center: [targetLocation[1], targetLocation[0]], // MapLibre takes [lng, lat]
+            zoom: 16,
+            pitch: 50,
+            duration: 2000
+        });
+    }, [targetLocation]);
 
     const handleZoomIn = () => map.current?.zoomIn();
     const handleZoomOut = () => map.current?.zoomOut();
@@ -249,7 +256,8 @@ export default function RealMap({ activeLayers }: RealMapProps) {
     return (
         <div className="relative w-full h-full bg-neutral-100 dark:bg-neutral-900 rounded-[2rem] overflow-hidden border border-neutral-300 dark:border-neutral-800 transition-colors duration-500">
             <div ref={mapContainer} className="w-full h-full" />
-            <SearchOverlay onSelectLocation={flyToCoords} />
+
+            {/* SEARCH OVERLAY IS HANDLED IN PAGE.TSX NOW */}
 
             <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-10">
                 <button onClick={handleReset} className="bg-white dark:bg-neutral-800 p-3 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition"><Navigation className="w-5 h-5" /></button>
