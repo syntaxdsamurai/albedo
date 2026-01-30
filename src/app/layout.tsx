@@ -9,12 +9,11 @@ export const metadata: Metadata = {
     title: "Albedo | Cool Cities",
     description: "AI-driven urban heat mitigation and albedo planning.",
     icons: {
-        icon: "/Logo.png", // <--- THIS SETS THE TAB ICON
-        shortcut: "/Logo.png",
-        apple: "/Logo.png", // For iPhone/iPad home screen
+        icon: "/app-logo.png", // <--- UPDATED
+        shortcut: "/app-logo.png",
+        apple: "/app-logo.png",
     },
 };
-
 export default function RootLayout({
                                        children,
                                    }: Readonly<{
