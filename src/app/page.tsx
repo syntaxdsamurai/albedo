@@ -1,18 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useScroll, useTransform, motion } from "framer-motion";
 
-import ImmersiveMap from "@/components/ImmersiveMap";
+// --- COMPONENTS ---
+import RealMap from "@/components/RealMap";
 import DashboardOverlay from "@/components/DashboardOverlay";
 import MaterialShowcase from "@/components/MaterialShowcase";
-import DetailedCalculator from "@/components/DetailedCalculator";
+import AlbedoCalculator from "@/components/AlbedoCalculator";
+import Footer from "@/components/Footer";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Home() {
     const containerRef = useRef<HTMLDivElement>(null);
-
-    // --- LIFTED STATE ---
-    // This state controls both the pins on the map and the numbers on the dashboard
     const [activeLayers, setActiveLayers] = useState<string[]>(["roof", "parking", "garden"]);
 
     const toggleLayer = (layer: string) => {
@@ -21,52 +21,77 @@ export default function Home() {
         );
     };
 
-    // Scroll Animation Logic
+    // --- SCROLL ANIMATION LOGIC ---
     const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+
+    // 1. Map Background Animations
     const mapScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95]);
     const mapY = useTransform(scrollYProgress, [0, 0.15], ["0%", "5%"]);
     const mapRadius = useTransform(scrollYProgress, [0, 0.15], ["0px", "40px"]);
     const mapOpacity = useTransform(scrollYProgress, [0.15, 0.25], [1, 0.5]);
 
-    return (
-        <main ref={containerRef} className="relative bg-[#F4F4F5] min-h-[350vh]">
+    // 2. DASHBOARD OVERLAY ANIMATIONS (Fixed Position: Bottom)
+    // Fades out between 10% and 15% scroll
+    const dashboardOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
+    // Slides DOWN slightly when fading out
+    const dashboardY = useTransform(scrollYProgress, [0, 0.15], [0, 50]);
 
-            {/* 1. MAP BACKGROUND (Controlled by State) */}
-            <div className="fixed top-0 left-0 w-full h-screen z-0 flex items-start justify-center pt-2 overflow-hidden">
+    // Disable clicks when hidden
+    const [pointerEvents, setPointerEvents] = useState<"auto" | "none">("auto");
+
+    useEffect(() => {
+        const unsubscribe = dashboardOpacity.on("change", (latest) => {
+            setPointerEvents(latest < 0.1 ? "none" : "auto");
+        });
+        return () => unsubscribe();
+    }, [dashboardOpacity]);
+
+    return (
+        <main ref={containerRef} className="relative bg-[#F4F4F5] dark:bg-black min-h-[350vh] transition-colors duration-500 selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black">
+
+            <ThemeToggle />
+
+            {/* 1. MAP BACKGROUND */}
+            <div className="fixed top-0 left-0 w-full h-screen z-0 flex items-start justify-center pt-2 overflow-hidden pointer-events-none">
                 <motion.div
                     style={{ scale: mapScale, y: mapY, borderRadius: mapRadius, opacity: mapOpacity }}
-                    className="w-full md:w-[98%] h-[95%] relative shadow-2xl overflow-hidden bg-white"
+                    className="w-full md:w-[98%] h-[95%] relative shadow-2xl overflow-hidden bg-white dark:bg-neutral-900 pointer-events-auto transition-colors duration-500"
                 >
-                    {/* Pass the state down to the map */}
-                    <ImmersiveMap activeLayers={activeLayers} />
+                    <RealMap activeLayers={activeLayers} />
                 </motion.div>
             </div>
 
+            {/* SPACER */}
             <div className="h-[90vh] w-full relative z-10 pointer-events-none" />
 
+            {/* 2. MAIN CONTENT STACK */}
             <div className="relative z-20 w-full flex flex-col items-center">
 
-                {/* 2. DASHBOARD (Controls the State) */}
-                <div className="w-full max-w-7xl px-4 -mt-32 mb-24 pointer-events-auto">
-                    <DashboardOverlay activeLayers={activeLayers} toggleLayer={toggleLayer} />
-                </div>
+                {/* DASHBOARD OMNIBAR - MOVED TO BOTTOM */}
+                <motion.div
+                    style={{ opacity: dashboardOpacity, y: dashboardY, pointerEvents }}
+                    // CHANGED: 'top-10' -> 'bottom-12' to sit at the bottom of the viewport
+                    className="fixed bottom-12 left-0 w-full z-50 px-4 flex justify-center"
+                >
+                    <div className="w-full max-w-4xl">
+                        <DashboardOverlay activeLayers={activeLayers} toggleLayer={toggleLayer} />
+                    </div>
+                </motion.div>
 
-                {/* 3. SCROLL CONTENT */}
-                <div className="w-full bg-[#F4F4F5] rounded-t-[3.5rem] shadow-[0_-40px_80px_rgba(0,0,0,0.05)] border-t border-white/50 overflow-hidden backdrop-blur-sm">
+                {/* SCROLLABLE CONTENT */}
+                <div className="w-full bg-[#F4F4F5] dark:bg-black rounded-t-[3.5rem] shadow-[0_-40px_80px_rgba(0,0,0,0.05)] border-t border-white/50 dark:border-white/10 overflow-hidden backdrop-blur-sm transition-colors duration-500 mt-[-5vh]">
+
                     <MaterialShowcase />
 
-                    <div className="w-full h-32 flex items-center justify-center overflow-hidden relative">
-            <span className="text-9xl font-bold text-neutral-200 uppercase tracking-tighter select-none opacity-50">
-              Estimate
-            </span>
+                    <div className="w-full h-48 flex items-center justify-center overflow-hidden relative bg-gradient-to-b from-[#F4F4F5] to-[#FDFBF7] dark:from-black dark:to-neutral-950 transition-colors duration-500">
+                        <span className="text-[12vw] font-black text-neutral-200/50 dark:text-neutral-800/50 uppercase tracking-tighter select-none leading-none">
+                            Estimate
+                        </span>
                     </div>
 
-                    <DetailedCalculator />
+                    <AlbedoCalculator />
+                    <Footer />
 
-                    {/* Footer Code (Same as before) */}
-                    <footer className="w-full bg-neutral-950 text-white pt-24 pb-12 px-6 rounded-t-[3rem] mt-[-3rem] relative z-10">
-                        {/* ... footer content ... */}
-                    </footer>
                 </div>
             </div>
         </main>

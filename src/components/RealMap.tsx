@@ -3,296 +3,280 @@
 import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Navigation, Plus, Minus, X, MapPin } from "lucide-react";
+import { Navigation, Plus, Minus, X } from "lucide-react";
+import { useTheme } from "next-themes";
+import SearchOverlay from "./SearchOverlay";
 
 // --- 1. CONFIGURATION ---
+const INITIAL_VIEW = { lng: 77.2167, lat: 28.6315, zoom: 11 };
+const ZOOM_THRESHOLD = 14.5;
+
 const HUBS = [
-    { name: "Connaught Place", lat: 28.6315, lng: 77.2167, type: "RING", tempDrop: "4.5°C" },
-    { name: "Nehru Place", lat: 28.5494, lng: 77.2537, type: "GRID", tempDrop: "3.8°C" },
-    { name: "DLF CyberHub", lat: 28.4950, lng: 77.0895, type: "LINEAR", tempDrop: "5.2°C" },
-    { name: "Noida Sec-18", lat: 28.5708, lng: 77.3271, type: "GRID", tempDrop: "4.1°C" },
-    { name: "Rohini Sec-10", lat: 28.7166, lng: 77.1126, type: "GRID", tempDrop: "3.5°C" },
-    { name: "Dwarka Sec-21", lat: 28.5887, lng: 77.0426, type: "GRID", tempDrop: "4.8°C" }
+    { name: "Connaught Place", lat: 28.6315, lng: 77.2167 },
+    { name: "Nehru Place", lat: 28.5494, lng: 77.2537 },
+    { name: "DLF CyberHub", lat: 28.4950, lng: 77.0895 },
+    { name: "Noida Sec-18", lat: 28.5708, lng: 77.3271 },
+    { name: "Rohini Sec-10", lat: 28.7166, lng: 77.1126 },
+    { name: "Dwarka Sec-21", lat: 28.5887, lng: 77.0426 }
 ];
 
-// --- 2. SMART GENERATION LOGIC ---
-const generateSmartData = (): any => {
+// --- 2. COLONY GENERATOR (Unchanged) ---
+const generateCityData = () => {
     const features: any[] = [];
-    const types = ["roof", "garden", "parking"];
+    const BUILDING_COUNT = 80;
+    const SPREAD_RADIUS = 0.0035;
 
     HUBS.forEach((hub, hubIdx) => {
-        let coords: [number, number][] = [];
+        const placedBuildings: {x: number, y: number, w: number, h: number}[] = [];
+        let attempts = 0;
+        let count = 0;
 
-        if (hub.type === "RING") {
-            for (let i = 0; i < 18; i++) {
-                const angle = (i / 18) * Math.PI * 2;
-                if (i % 3 === 0) continue;
-                coords.push([
-                    hub.lng + Math.cos(angle) * 0.0018,
-                    hub.lat + Math.sin(angle) * 0.0018
-                ]);
-            }
-            for (let i = 0; i < 36; i++) {
-                const angle = (i / 36) * Math.PI * 2;
-                if (i % 3 === 0) continue;
-                coords.push([
-                    hub.lng + Math.cos(angle) * 0.0035,
-                    hub.lat + Math.sin(angle) * 0.0035
-                ]);
-            }
-        }
-        else if (hub.type === "GRID") {
-            const spacing = 0.0015;
-            for (let r = -rows/2; r < rows/2; r++) {
-                for (let c = -cols/2; c < cols/2; c++) {
-                    if (Math.abs(r) < 1 && Math.abs(c) < 1) continue;
-                    const jitterX = (Math.random() - 0.5) * 0.0004;
-                    const jitterY = (Math.random() - 0.5) * 0.0004;
-                    coords.push([
-                        hub.lng + (c * spacing) + jitterX,
-                        hub.lat + (r * spacing) + jitterY
-                    ]);
-                }
-            }
-        }
-        else {
-            for (let i = -10; i < 10; i++) {
-                coords.push([
-                    hub.lng + (i * 0.0015),
-                    hub.lat + (i * 0.0012) + (Math.random() * 0.0005)
-                ]);
-                coords.push([
-                    hub.lng + (i * 0.0015) + 0.001,
-                    hub.lat + (i * 0.0012) - 0.0005
-                ]);
-            }
-        }
+        while (count < BUILDING_COUNT && attempts < 1000) {
+            attempts++;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.sqrt(Math.random()) * SPREAD_RADIUS;
+            const dx = Math.cos(angle) * dist;
+            const dy = Math.sin(angle) * dist;
 
-        coords.forEach((pt, i) => {
-            const type = types[i % 3];
-            const size = 0.0001;
+            if (Math.abs(dx) < 0.0004 || Math.abs(dy) < 0.0004) continue;
 
-            const poly = [
-                [pt[0] - size, pt[1] - size],
-                [pt[0] + size, pt[1] - size],
-                [pt[0] + size, pt[1] + size],
-                [pt[0] - size, pt[1] + size],
-                [pt[0] - size, pt[1] - size]
-            ];
+            const width = 0.00015 + (Math.random() * 0.00020);
+            const heightFactor = 0.5 + Math.random();
+            const depth = width * heightFactor;
+
+            const hasOverlap = placedBuildings.some(b => {
+                const minDist = 0.0002;
+                return (Math.abs(dx - b.x) < (width + b.w)/2 + minDist && Math.abs(dy - b.y) < (depth + b.h)/2 + minDist);
+            });
+            if (hasOverlap) continue;
+            placedBuildings.push({ x: dx, y: dy, w: width, h: depth });
+            count++;
+
+            const lng = hub.lng + dx;
+            const lat = hub.lat + dy;
+
+            const rand = Math.random();
+            let type = "standard";
+            let color = "#cbd5e1";
+            let bHeight = 15 + Math.random() * 40;
+            let label = "Commercial Block";
+            let tempDrop = "0°C";
+            let isSpecial = false;
+
+            if (rand > 0.93) {
+                type = "garden"; color = "#10b981"; label = "Bio-Facade System"; tempDrop = "3.1°C"; isSpecial = true;
+            } else if (rand > 0.88) {
+                type = "parking"; color = "#3b82f6"; bHeight = 4; label = "Solar Parking Grid"; tempDrop = "5.5°C"; isSpecial = true;
+            } else if (rand > 0.80) {
+                type = "roof"; color = "#f97316"; label = "Cool Roof Retrofit"; tempDrop = "4.2°C"; isSpecial = true;
+            }
+
+            const halfW = width / 2;
+            const halfD = depth / 2;
+            const poly = [[lng - halfW, lat - halfD], [lng + halfW, lat - halfD], [lng + halfW, lat + halfD], [lng - halfW, lat + halfD], [lng - halfW, lat - halfD]];
 
             features.push({
-                "type": "Feature",
-                "properties": {
-                    "id": `${hubIdx}-${i}`,
-                    "type": type,
-                    "hub": hub.name,
-                    "height": type === 'roof' ? 30 : type === 'garden' ? 12 : 3,
-                    "base": type === 'roof' ? 29 : 0,
-                    "emoji": type === 'roof' ? '⚡' : type === 'garden' ? '🌳' : '🚗',
-                    "color": type === 'roof' ? '#f97316' : type === 'garden' ? '#10b981' : '#3b82f6',
-                    "temp": `-${(Math.random() * 3 + 2).toFixed(1)}°`
-                },
-                "geometry": { "type": "Polygon", "coordinates": [poly] }
+                type: "Feature",
+                properties: { id: `${hubIdx}-${count}`, type, color, height: bHeight, label, tempDrop, hub: hub.name, isSpecial },
+                geometry: { type: "Polygon", coordinates: [poly] }
             });
-        });
+        }
     });
-
-    return { "type": "FeatureCollection" as const, "features": features };
+    return { type: "FeatureCollection", features };
 };
 
-const rows = 6;
-const cols = 6;
+const CITY_DATA = generateCityData();
 
-const generateSummaryData = (): any => ({
-    "type": "FeatureCollection" as const,
-    "features": HUBS.map(hub => ({
-        "type": "Feature",
-        "properties": {
-            "name": hub.name,
-            "label": `Avg Temp ${hub.tempDrop}`
-        },
-        "geometry": { "type": "Point", "coordinates": [hub.lng, hub.lat] }
-    }))
-});
+// --- PROPS INTERFACE ---
+interface RealMapProps {
+    activeLayers: string[]; // <--- THIS IS NEW
+}
 
-const DETAILED_GEOJSON = generateSmartData();
-const SUMMARY_GEOJSON = generateSummaryData();
-const ZOOM_THRESHOLD = 13.5;
-
-interface RealMapProps { activeLayers: string[]; targetLocation?: [number, number] | null; }
-
-export default function RealMap({ activeLayers, targetLocation }: RealMapProps) {
+export default function RealMap({ activeLayers }: RealMapProps) {
+    const { resolvedTheme } = useTheme();
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
-    const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [isZoomedIn, setIsZoomedIn] = useState(false);
+    const markersRef = useRef<maplibregl.Marker[]>([]);
+    const [selectedFeature, setSelectedFeature] = useState<any>(null);
 
+    // 1. INITIALIZE MAP
     useEffect(() => {
-        // --- SAFEGUARD: Prevent double-loading ---
-        if (map.current || !mapContainer.current) return;
+        if (map.current) {
+            markersRef.current.forEach(m => m.remove());
+            map.current.remove();
+            map.current = null;
+        }
 
-        map.current = new maplibregl.Map({
+        if (!mapContainer.current) return;
+
+        const isDark = resolvedTheme === 'dark';
+        const styleUrl = isDark
+            ? "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            : "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+
+        const m = new maplibregl.Map({
             container: mapContainer.current,
-            style: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-            center: [77.2167, 28.6315],
-            zoom: 11,
+            style: styleUrl,
+            center: [INITIAL_VIEW.lng, INITIAL_VIEW.lat],
+            zoom: INITIAL_VIEW.zoom,
             pitch: 0,
-            bearing: 0,
+            attributionControl: false
         });
 
-        const m = map.current;
+        map.current = m;
 
         m.on("load", () => {
-            if (!map.current) return; // Check if map was destroyed during load
+            m.addSource('albedo-city', { type: 'geojson', data: CITY_DATA as any });
 
-            m.addSource('detailed-data', { type: 'geojson', data: DETAILED_GEOJSON });
-            m.addSource('summary-data', { type: 'geojson', data: SUMMARY_GEOJSON });
-
-            // 1. 3D BLOCKS (Detailed)
             m.addLayer({
-                'id': 'detailed-blocks',
-                'source': 'detailed-data',
+                'id': '3d-buildings',
+                'source': 'albedo-city',
                 'type': 'fill-extrusion',
-                'minzoom': ZOOM_THRESHOLD,
                 'paint': {
                     'fill-extrusion-color': ['get', 'color'],
                     'fill-extrusion-height': ['get', 'height'],
-                    'fill-extrusion-base': ['get', 'base'],
-                    'fill-extrusion-opacity': 0.85
+                    'fill-extrusion-base': 0,
+                    'fill-extrusion-opacity': isDark ? 0.6 : 0.8,
+                    'fill-extrusion-vertical-gradient': true
                 }
             });
 
-            // 2. FLOATING EMOJIS (Detailed)
-            m.addLayer({
-                'id': 'detailed-emojis',
-                'source': 'detailed-data',
-                'type': 'symbol',
-                'minzoom': ZOOM_THRESHOLD,
-                'layout': {
-                    'text-field': ['get', 'emoji'],
-                    'text-size': ['interpolate', ['linear'], ['zoom'], 14, 12, 18, 26],
-                    'text-offset': [0, -1],
-                    'text-allow-overlap': false,
-                }
+            // Initial Filter Application
+            const filter: any = ['any', ['==', 'type', 'standard'], ['in', 'type', ...activeLayers]];
+            m.setFilter('3d-buildings', filter);
+
+            // LOGO PINS
+            markersRef.current = [];
+            HUBS.forEach((hub) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'hub-marker-wrapper';
+                wrapper.style.cursor = 'pointer';
+                wrapper.style.width = '48px';
+                wrapper.style.height = '48px';
+                wrapper.style.transition = 'opacity 0.4s ease';
+                wrapper.style.zIndex = '10';
+
+                const inner = document.createElement('div');
+                const bg = isDark ? '#171717' : '#ffffff';
+                const border = isDark ? '2px solid #ffffff' : '1px solid #e5e5e5';
+
+                inner.style.width = '100%';
+                inner.style.height = '100%';
+                inner.style.backgroundColor = bg;
+                inner.style.borderRadius = '50%';
+                inner.style.border = border;
+                inner.style.boxShadow = '0 8px 20px rgba(0,0,0,0.25)';
+                inner.style.display = 'flex';
+                inner.style.alignItems = 'center';
+                inner.style.justifyContent = 'center';
+
+                const img = document.createElement('img');
+                img.src = "/Logo.png";
+                img.style.width = '60%';
+                img.style.height = '60%';
+                img.style.objectFit = 'contain';
+
+                inner.appendChild(img);
+                wrapper.appendChild(inner);
+
+                wrapper.onclick = () => {
+                    m.flyTo({ center: [hub.lng, hub.lat], zoom: 16.5, pitch: 60, bearing: -20 });
+                };
+
+                const marker = new maplibregl.Marker({ element: wrapper })
+                    .setLngLat([hub.lng, hub.lat])
+                    .addTo(m);
+
+                markersRef.current.push(marker);
             });
 
-            // 3. REGIONAL PINS (Zoomed Out) - NO TEXT, JUST PINS
-            m.addLayer({
-                'id': 'summary-pins',
-                'source': 'summary-data',
-                'type': 'circle',
-                'maxzoom': ZOOM_THRESHOLD,
-                'paint': {
-                    // Big Green Pin Style
-                    'circle-radius': 10,
-                    'circle-color': '#10b981', // Emerald Green
-                    'circle-stroke-width': 3,
-                    'circle-stroke-color': '#ffffff', // White border
-                    'circle-opacity': 1
-                }
-            });
+            const updateVisibility = () => {
+                const currentZoom = m.getZoom();
+                const isMicroView = currentZoom >= ZOOM_THRESHOLD;
 
-            // EVENTS
-            m.on('zoomend', () => {
-                const zoom = m.getZoom();
-                setIsZoomedIn(zoom > ZOOM_THRESHOLD);
-                m.easeTo({ pitch: zoom > ZOOM_THRESHOLD ? 55 : 0 });
-            });
+                markersRef.current.forEach(marker => {
+                    const el = marker.getElement();
+                    el.style.opacity = isMicroView ? '0' : '1';
+                    el.style.pointerEvents = isMicroView ? 'none' : 'auto';
+                });
+            };
 
-            m.on('click', 'detailed-blocks', (e) => {
+            m.on('zoom', updateVisibility);
+            updateVisibility();
+
+            m.on('click', '3d-buildings', (e) => {
                 if (!e.features?.[0]) return;
-                const f = e.features[0];
-                setSelectedItem({ ...f.properties, lat: e.lngLat.lat, lng: e.lngLat.lng });
-                m.flyTo({ center: e.lngLat, zoom: 17.5, pitch: 60 });
+                const props = e.features[0].properties;
+                if (!props.isSpecial) return;
+
+                setSelectedFeature({
+                    ...props,
+                    lat: e.lngLat.lat,
+                    lng: e.lngLat.lng
+                });
+
+                m.easeTo({ center: e.lngLat, offset: [0, 100], duration: 800 });
             });
 
-            m.on('click', 'summary-pins', (e) => {
-                if (!e.features?.[0]) return;
-                m.flyTo({ center: e.lngLat, zoom: 15.5 });
-            });
-
-            ['detailed-blocks', 'summary-pins'].forEach(l => {
-                m.on('mouseenter', l, () => m.getCanvas().style.cursor = 'pointer');
-                m.on('mouseleave', l, () => m.getCanvas().style.cursor = '');
-            });
+            m.on('mouseenter', '3d-buildings', () => m.getCanvas().style.cursor = 'pointer');
+            m.on('mouseleave', '3d-buildings', () => m.getCanvas().style.cursor = '');
         });
 
-        // --- THE CRITICAL FIX ---
-        // This cleanup function destroys the map when you navigate away or reload.
-        // Without this, the browser freezes because multiple maps fight for control.
-        return () => {
-            if (map.current) {
-                map.current.remove();
-                map.current = null;
-            }
-        };
+    }, [resolvedTheme]);
 
-    }, []);
-
-    // FILTERS
+    // 2. LIVE FILTERING EFFECT
+    // This runs whenever activeLayers changes, WITHOUT reloading the map
     useEffect(() => {
-        if (!map.current || !map.current.getLayer('detailed-blocks')) return;
-        const m = map.current;
-        const filter: any = ['any', ...activeLayers.map(layer => ['==', 'type', layer])];
+        if (!map.current || !map.current.getLayer('3d-buildings')) return;
 
-        m.setFilter('detailed-blocks', filter);
-        m.setFilter('detailed-emojis', filter);
+        // Show Standard buildings OR buildings in the active list
+        const filter: any = ['any', ['==', 'type', 'standard'], ['in', 'type', ...activeLayers]];
+        map.current.setFilter('3d-buildings', filter);
+
     }, [activeLayers]);
 
-    // SEARCH
-    useEffect(() => {
-        if (map.current && targetLocation) {
-            map.current.flyTo({ center: [targetLocation[1], targetLocation[0]], zoom: 16 });
-        }
-    }, [targetLocation]);
+    const flyToCoords = (lat: number, lng: number) => {
+        map.current?.flyTo({ center: [lng, lat], zoom: 16.5, pitch: 60, duration: 2000 });
+    };
 
-    const handleZoom = (d: 'in' | 'out') => map.current?.[d === 'in' ? 'zoomIn' : 'zoomOut']();
-    const handleReset = () => map.current?.flyTo({ center: [77.2167, 28.6315], zoom: 11, pitch: 0 });
+    const handleZoomIn = () => map.current?.zoomIn();
+    const handleZoomOut = () => map.current?.zoomOut();
+    const handleReset = () => {
+        map.current?.flyTo({ center: [INITIAL_VIEW.lng, INITIAL_VIEW.lat], zoom: INITIAL_VIEW.zoom, pitch: 0 });
+        setSelectedFeature(null);
+    };
 
     return (
-        <div className="w-full h-full relative group bg-neutral-100 border border-neutral-300 rounded-[3rem] overflow-hidden">
+        <div className="relative w-full h-full bg-neutral-100 dark:bg-neutral-900 rounded-[2rem] overflow-hidden border border-neutral-300 dark:border-neutral-800 transition-colors duration-500">
             <div ref={mapContainer} className="w-full h-full" />
+            <SearchOverlay onSelectLocation={flyToCoords} />
 
-            {/* CONTROLS */}
             <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-10">
-                <button onClick={handleReset} className="bg-white p-3 rounded-xl shadow-xl border border-neutral-200 text-neutral-600 hover:text-black transition">
-                    <Navigation className="w-5 h-5" />
-                </button>
-                <div className="bg-white rounded-xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col">
-                    <button onClick={() => handleZoom("in")} className="p-3 hover:bg-neutral-50 border-b border-neutral-100 text-neutral-600"><Plus className="w-5 h-5" /></button>
-                    <button onClick={() => handleZoom("out")} className="p-3 hover:bg-neutral-50 text-neutral-600"><Minus className="w-5 h-5" /></button>
+                <button onClick={handleReset} className="bg-white dark:bg-neutral-800 p-3 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition"><Navigation className="w-5 h-5" /></button>
+                <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden flex flex-col">
+                    <button onClick={handleZoomIn} className="p-3 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-b border-neutral-100 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300"><Plus className="w-5 h-5" /></button>
+                    <button onClick={handleZoomOut} className="p-3 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300"><Minus className="w-5 h-5" /></button>
                 </div>
             </div>
 
-            {/* DETAIL POPUP */}
-            {selectedItem && isZoomedIn && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[150%] z-20 pointer-events-none">
-                    <div className="bg-white/95 backdrop-blur-md p-5 rounded-3xl shadow-2xl border border-neutral-200 min-w-[220px] text-center animate-in fade-in zoom-in slide-in-from-bottom-4 duration-300 pointer-events-auto relative">
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">{selectedItem.hub}</div>
-
-                        <div className="text-5xl mb-3 drop-shadow-sm animate-bounce">{selectedItem.emoji}</div>
-
-                        <div className="text-xl font-bold text-neutral-900 capitalize leading-tight mb-1">
-                            {selectedItem.type === 'roof' ? 'Solar Roof' : selectedItem.type === 'garden' ? 'Bio Garden' : 'Solar Parking'}
+            {selectedFeature && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[140%] z-30 pointer-events-none animate-in fade-in zoom-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-white/90 dark:bg-black/80 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-neutral-200 dark:border-white/10 min-w-[260px] text-center pointer-events-auto relative">
+                        <button onClick={() => setSelectedFeature(null)} className="absolute top-2 right-2 p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition"><X className="w-3 h-3 text-neutral-400" /></button>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">{selectedFeature.hub}</div>
+                        <div className="text-xl font-bold text-neutral-900 dark:text-white leading-tight mb-2">{selectedFeature.label}</div>
+                        <div className="flex items-center justify-center gap-3 mt-4">
+                            <div className="text-center px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">Temp Drop</div>
+                                <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">{selectedFeature.tempDrop}</div>
+                            </div>
+                            <div className="text-center px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                                <div className="text-[10px] text-neutral-500 uppercase font-bold">Type</div>
+                                <div className="text-sm font-bold text-neutral-700 dark:text-neutral-300 capitalize">{selectedFeature.type}</div>
+                            </div>
                         </div>
-
-                        <div className="inline-flex items-center gap-1.5 bg-neutral-100 px-3 py-1 rounded-full mt-2">
-                            <span className="text-xs font-bold text-neutral-500 uppercase">Impact</span>
-                            <span className="text-sm font-black text-neutral-800">{selectedItem.temp}C</span>
-                        </div>
-
-                        <button onClick={() => setSelectedItem(null)} className="absolute -top-3 -right-3 bg-neutral-900 text-white rounded-full p-1.5 shadow-lg hover:scale-110 transition border-2 border-white">
-                            <X className="w-4 h-4" />
-                        </button>
                     </div>
-                    <div className="w-4 h-4 bg-white/95 border-r border-b border-neutral-200 absolute left-1/2 -translate-x-1/2 -bottom-2 rotate-45"></div>
-                </div>
-            )}
-
-            {/* ZOOM INDICATOR */}
-            {!isZoomedIn && (
-                <div className="absolute top-8 left-8 bg-white/90 backdrop-blur border border-neutral-200 text-neutral-600 px-4 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 z-10">
-                    <MapPin className="w-4 h-4 text-emerald-500" /> Regional Impact View
+                    <div className="w-4 h-4 bg-white/90 dark:bg-black/80 border-r border-b border-neutral-200 dark:border-white/10 backdrop-blur-xl absolute left-1/2 -translate-x-1/2 -bottom-2 rotate-45"></div>
                 </div>
             )}
         </div>

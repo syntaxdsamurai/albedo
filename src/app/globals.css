@@ -2,78 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-    --background: #F4F4F5;
-    --foreground: #18181B;
-    --card: #FFFFFF;
-    --border: #E4E4E7;
-    --primary: #2563EB;
+/* ... your existing imports ... */
+
+@layer utilities {
+    /* Hide Scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
 }
 
-/* 1. TEXTURE & BASE */
-body {
-    background-color: var(--background);
-    color: var(--foreground);
-    /* Subtle noise texture for that "magazine paper" feel */
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
-    -webkit-font-smoothing: antialiased;
+/* --- 3D PERSPECTIVE UTILITIES (Required for Calculator) --- */
+.perspective-container {
+    perspective: 1000px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* 2. CUSTOM SCROLLBAR (Minimalist) */
-::-webkit-scrollbar {
-    width: 6px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: #D4D4D8;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #A1A1AA;
+.scene-3d {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* 3. SELECTION (High Contrast) */
+/* --- TEXT SELECTION STYLING --- */
 ::selection {
-    background: #000;
+    background-color: #000;
     color: #fff;
 }
 
-/* 4. UTILITIES */
-.perspective-container {
-    perspective: 1200px;
-}
-
-/* Glass Card Utility */
-.glass-panel {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-/* Hide scrollbar for clean horizontal scrolls */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
-/* Leaflet Popup Customization */
-.leaflet-popup-content-wrapper {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    box-shadow: 0 10px 40px -10px rgba(0,0,0,0.1);
-    border: 1px solid rgba(255,255,255,0.5);
-    padding: 0;
-}
-.leaflet-popup-tip {
-    background: rgba(255, 255, 255, 0.9);
-}
-.leaflet-container {
-    font-family: inherit;
+/* Dark mode selection */
+.dark ::selection {
+    background-color: #fff;
+    color: #000;
 }

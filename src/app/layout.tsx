@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "Project Albedo | Urban Thermal Twin",
-    description: "AI-Powered Urban Heat Island Detection & Mitigation",
+    title: "Albedo | Cool Cities",
+    description: "AI-driven urban heat mitigation and albedo planning.",
+    icons: {
+        icon: "/Logo.png", // <--- THIS SETS THE TAB ICON
+        shortcut: "/Logo.png",
+        apple: "/Logo.png", // For iPhone/iPad home screen
+    },
 };
 
 export default function RootLayout({
@@ -18,14 +23,9 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
-        <ThemeProvider
-            attribute="class"
-            defaultTheme="dark" // We default to the "Cool" dark mode
-            enableSystem
-            disableTransitionOnChange
-        >
+        <Providers>
             {children}
-        </ThemeProvider>
+        </Providers>
         </body>
         </html>
     );
