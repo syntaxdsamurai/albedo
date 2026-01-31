@@ -97,9 +97,22 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
     const map = useRef<maplibregl.Map | null>(null);
     const markersRef = useRef<maplibregl.Marker[]>([]);
     const [selectedFeature, setSelectedFeature] = useState<any>(null);
+    const [isMobile, setIsMobile] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    // Detect mobile
+    useEffect(() => {
+        setMounted(true);
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener("resize", checkMobile);
+        return () => window.removeEventListener("resize", checkMobile);
+    }, []);
 
     // 1. INITIALIZE MAP
     useEffect(() => {
+        if (!mounted) return;
+
         if (map.current) {
             markersRef.current.forEach(m => m.remove());
             map.current.remove();
@@ -121,8 +134,11 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
             pitch: 0,
             attributionControl: false,
             // MOBILE OPTIMIZATIONS
-            trackResize: true, // Handle address bar changes
-            cooperativeGestures: false, // Allow one-finger pan (crucial for full screen apps)
+            trackResize: true,
+            cooperativeGestures: false,
+            // Prevent flickering on mobile
+            fadeDuration: isMobile ? 0 : 300,
+            refreshExpiredTiles: false,
         });
 
         map.current = m;
@@ -150,38 +166,49 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
             HUBS.forEach((hub) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'hub-marker-wrapper';
-                wrapper.style.cursor = 'pointer';
-                wrapper.style.width = '48px';
-                wrapper.style.height = '48px';
-                wrapper.style.transition = 'opacity 0.4s ease';
-                wrapper.style.zIndex = '10';
+                wrapper.style.cssText = `
+                    cursor: pointer;
+                    width: 48px;
+                    height: 48px;
+                    transition: opacity 0.4s ease;
+                    z-index: 10;
+                `;
 
                 const inner = document.createElement('div');
                 const bg = isDark ? '#171717' : '#ffffff';
                 const border = isDark ? '2px solid #ffffff' : '1px solid #e5e5e5';
 
-                inner.style.width = '100%';
-                inner.style.height = '100%';
-                inner.style.backgroundColor = bg;
-                inner.style.borderRadius = '50%';
-                inner.style.border = border;
-                inner.style.boxShadow = '0 8px 20px rgba(0,0,0,0.25)';
-                inner.style.display = 'flex';
-                inner.style.alignItems = 'center';
-                inner.style.justifyContent = 'center';
+                inner.style.cssText = `
+                    width: 100%;
+                    height: 100%;
+                    background-color: ${bg};
+                    border-radius: 50%;
+                    border: ${border};
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
 
                 const img = document.createElement('img');
-                // Ensure this matches your file name exactly
                 img.src = "/app-logo.png";
-                img.style.width = '60%';
-                img.style.height = '60%';
-                img.style.objectFit = 'contain';
+                img.style.cssText = `
+                    width: 60%;
+                    height: 60%;
+                    object-fit: contain;
+                `;
 
                 inner.appendChild(img);
                 wrapper.appendChild(inner);
 
                 wrapper.onclick = () => {
-                    m.flyTo({ center: [hub.lng, hub.lat], zoom: 16.5, pitch: 60, bearing: -20 });
+                    m.flyTo({
+                        center: [hub.lng, hub.lat],
+                        zoom: 16.5,
+                        pitch: isMobile ? 45 : 60,
+                        bearing: -20,
+                        duration: isMobile ? 1000 : 1500
+                    });
                 };
 
                 const marker = new maplibregl.Marker({ element: wrapper })
@@ -219,8 +246,6 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
                 m.easeTo({ center: e.lngLat, offset: [0, 100], duration: 800 });
             });
 
-            // POINTER CURSOR LOGIC
-            // We use 'mousemove' instead of 'mouseenter' for smoother mobile response
             m.on('mousemove', '3d-buildings', (e) => {
                 if (e.features && e.features.length > 0) {
                     m.getCanvas().style.cursor = 'pointer';
@@ -231,7 +256,14 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
             });
         });
 
-    }, [resolvedTheme]);
+        return () => {
+            markersRef.current.forEach(m => m.remove());
+            if (map.current) {
+                map.current.remove();
+                map.current = null;
+            }
+        };
+    }, [resolvedTheme, mounted, isMobile]);
 
     // 2. LIVE FILTERING
     useEffect(() => {
@@ -247,10 +279,10 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
         map.current.flyTo({
             center: [targetLocation[1], targetLocation[0]],
             zoom: 16,
-            pitch: 50,
+            pitch: isMobile ? 45 : 50,
             duration: 2000
         });
-    }, [targetLocation]);
+    }, [targetLocation, isMobile]);
 
     const handleZoomIn = () => map.current?.zoomIn();
     const handleZoomOut = () => map.current?.zoomOut();
@@ -259,15 +291,25 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
         setSelectedFeature(null);
     };
 
+    if (!mounted) {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-neutral-100 dark:bg-neutral-900">
+                <div className="text-neutral-400">Loading map...</div>
+            </div>
+        );
+    }
+
     return (
         <div className="relative w-full h-full bg-neutral-100 dark:bg-neutral-900 rounded-[2rem] overflow-hidden border border-neutral-300 dark:border-neutral-800 transition-colors duration-500">
-            {/* CRITICAL FIX FOR MOBILE:
-               touch-action: none -> Prevents browser scrolling when you drag the map
-            */}
             <div
                 ref={mapContainer}
                 className="w-full h-full"
-                style={{ touchAction: "none" }}
+                style={{
+                    touchAction: "none",
+                    // Prevent flickering on mobile webkit
+                    WebkitTransform: "translateZ(0)",
+                    transform: "translateZ(0)",
+                }}
             />
 
             <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-10">

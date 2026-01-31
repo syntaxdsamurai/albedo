@@ -14,11 +14,16 @@ import ThemeToggle from "@/components/ThemeToggle";
 export default function Home() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeLayers, setActiveLayers] = useState<string[]>(["roof", "parking", "garden"]);
-    const [isMobile, setIsMobile] = useState(true); // Default to true to prevent hydration mismatch flicker
+    const [isMobile, setIsMobile] = useState(false); // Start with false to prevent hydration mismatch
+    const [mounted, setMounted] = useState(false);
 
     // --- DETECT MOBILE ---
     useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        setMounted(true);
+        const checkMobile = () => {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+        };
         checkMobile();
         window.addEventListener("resize", checkMobile);
         return () => window.removeEventListener("resize", checkMobile);
@@ -30,26 +35,44 @@ export default function Home() {
         );
     };
 
-    // --- SCROLL ANIMATION LOGIC ---
-    const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+    // --- SCROLL ANIMATION LOGIC (DESKTOP ONLY) ---
+    const { scrollYProgress } = useScroll({
+        target: containerRef,
+        offset: ["start start", "end end"]
+    });
 
-    // DESKTOP ANIMATIONS ONLY
-    const mapScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95]);
-    const mapY = useTransform(scrollYProgress, [0, 0.15], ["0%", "5%"]);
-    const mapRadius = useTransform(scrollYProgress, [0, 0.15], ["0px", "40px"]);
-    const mapOpacity = useTransform(scrollYProgress, [0.15, 0.25], [1, 0.5]);
+    // DESKTOP ANIMATIONS ONLY - disabled on mobile
+    const mapScale = useTransform(scrollYProgress, [0, 0.15], isMobile ? [1, 1] : [1, 0.95]);
+    const mapY = useTransform(scrollYProgress, [0, 0.15], isMobile ? ["0%", "0%"] : ["0%", "5%"]);
+    const mapRadius = useTransform(scrollYProgress, [0, 0.15], isMobile ? ["0px", "0px"] : ["0px", "40px"]);
+    const mapOpacity = useTransform(scrollYProgress, [0.15, 0.25], isMobile ? [1, 1] : [1, 0.5]);
 
     // DASHBOARD ANIMATIONS
-    const dashboardOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
-    const dashboardY = useTransform(scrollYProgress, [0, 0.15], [0, 50]);
+    const dashboardOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], isMobile ? [1, 1, 1] : [1, 1, 0]);
+    const dashboardY = useTransform(scrollYProgress, [0, 0.15], isMobile ? [0, 0] : [0, 50]);
     const [pointerEvents, setPointerEvents] = useState<"auto" | "none">("auto");
 
     useEffect(() => {
+        if (isMobile) {
+            setPointerEvents("auto");
+            return;
+        }
         const unsubscribe = dashboardOpacity.on("change", (latest) => {
             setPointerEvents(latest < 0.1 ? "none" : "auto");
         });
         return () => unsubscribe();
-    }, [dashboardOpacity]);
+    }, [dashboardOpacity, isMobile]);
+
+    // Don't render until mounted to prevent hydration issues
+    if (!mounted) {
+        return (
+            <main className="relative bg-[#F4F4F5] dark:bg-black min-h-screen">
+                <div className="fixed inset-0 flex items-center justify-center">
+                    <div className="text-neutral-400">Loading...</div>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main ref={containerRef} className="relative bg-[#F4F4F5] dark:bg-black min-h-[350vh] transition-colors duration-500 selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black">
@@ -57,12 +80,10 @@ export default function Home() {
             <ThemeToggle />
 
             {/* 1. MAP BACKGROUND */}
-            {/* FIX: 'fixed inset-0' locks all 4 corners. 'z-0' keeps it behind. */}
             <div className="fixed inset-0 w-full h-full z-0 flex items-start justify-center pt-0 md:pt-2 overflow-hidden pointer-events-none touch-none">
 
                 {isMobile ? (
-                    // --- MOBILE VERSION (Static, No Motion) ---
-                    // This is a plain div. It cannot flicker because it has no animation logic attached.
+                    // --- MOBILE VERSION (Static, No Motion, No Flicker) ---
                     <div className="w-full h-full relative shadow-none overflow-hidden bg-white dark:bg-neutral-900 pointer-events-auto transition-colors duration-500">
                         <RealMap activeLayers={activeLayers} />
                     </div>
@@ -78,21 +99,30 @@ export default function Home() {
             </div>
 
             {/* SPACER */}
-            {/* Use 100svh (Small Viewport Height) to respect mobile address bars properly */}
             <div className="h-[100svh] w-full relative z-10 pointer-events-none" />
 
             {/* 2. MAIN CONTENT STACK */}
             <div className="relative z-20 w-full flex flex-col items-center">
 
                 {/* DASHBOARD OMNIBAR */}
-                <motion.div
-                    style={{ opacity: dashboardOpacity, y: dashboardY, pointerEvents }}
-                    className="fixed bottom-8 md:bottom-12 left-0 w-full z-50 px-4 flex justify-center"
-                >
-                    <div className="w-full max-w-4xl">
-                        <DashboardOverlay activeLayers={activeLayers} toggleLayer={toggleLayer} />
+                {isMobile ? (
+                    // Mobile: No animation, always visible
+                    <div className="fixed bottom-8 left-0 w-full z-50 px-4 flex justify-center">
+                        <div className="w-full max-w-4xl">
+                            <DashboardOverlay activeLayers={activeLayers} toggleLayer={toggleLayer} />
+                        </div>
                     </div>
-                </motion.div>
+                ) : (
+                    // Desktop: Animated
+                    <motion.div
+                        style={{ opacity: dashboardOpacity, y: dashboardY, pointerEvents }}
+                        className="fixed bottom-8 md:bottom-12 left-0 w-full z-50 px-4 flex justify-center"
+                    >
+                        <div className="w-full max-w-4xl">
+                            <DashboardOverlay activeLayers={activeLayers} toggleLayer={toggleLayer} />
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* SCROLLABLE CONTENT */}
                 <div className="w-full bg-[#F4F4F5] dark:bg-black rounded-t-[2rem] md:rounded-t-[3.5rem] shadow-[0_-40px_80px_rgba(0,0,0,0.05)] border-t border-white/50 dark:border-white/10 overflow-hidden backdrop-blur-sm transition-colors duration-500 mt-[-5vh]">
