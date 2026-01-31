@@ -5,8 +5,6 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Navigation, Plus, Minus, X } from "lucide-react";
 import { useTheme } from "next-themes";
-// Remove SearchOverlay import from here since we moved it to page.tsx
-// import SearchOverlay from "./SearchOverlay";
 
 // --- 1. CONFIGURATION ---
 const INITIAL_VIEW = { lng: 77.2167, lat: 28.6315, zoom: 11 };
@@ -21,7 +19,7 @@ const HUBS = [
     { name: "Dwarka Sec-21", lat: 28.5887, lng: 77.0426 }
 ];
 
-// --- 2. COLONY GENERATOR ---
+// --- 2. COLONY GENERATOR (Static Data) ---
 const generateCityData = () => {
     const features: any[] = [];
     const BUILDING_COUNT = 80;
@@ -88,10 +86,8 @@ const generateCityData = () => {
 
 const CITY_DATA = generateCityData();
 
-// --- 3. PROPS INTERFACE UPDATE ---
 interface RealMapProps {
     activeLayers: string[];
-    // Fix: Add targetLocation prop definition
     targetLocation?: [number, number] | null;
 }
 
@@ -123,7 +119,10 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
             center: [INITIAL_VIEW.lng, INITIAL_VIEW.lat],
             zoom: INITIAL_VIEW.zoom,
             pitch: 0,
-            attributionControl: false
+            attributionControl: false,
+            // MOBILE OPTIMIZATIONS
+            trackResize: true, // Handle address bar changes
+            cooperativeGestures: false, // Allow one-finger pan (crucial for full screen apps)
         });
 
         map.current = m;
@@ -144,11 +143,9 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
                 }
             });
 
-            // Initial Filter Application
             const filter: any = ['any', ['==', 'type', 'standard'], ['in', 'type', ...activeLayers]];
             m.setFilter('3d-buildings', filter);
 
-            // LOGO PINS
             markersRef.current = [];
             HUBS.forEach((hub) => {
                 const wrapper = document.createElement('div');
@@ -174,7 +171,8 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
                 inner.style.justifyContent = 'center';
 
                 const img = document.createElement('img');
-                img.src = "/Logo.png";
+                // Ensure this matches your file name exactly
+                img.src = "/app-logo.png";
                 img.style.width = '60%';
                 img.style.height = '60%';
                 img.style.objectFit = 'contain';
@@ -221,25 +219,33 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
                 m.easeTo({ center: e.lngLat, offset: [0, 100], duration: 800 });
             });
 
-            m.on('mouseenter', '3d-buildings', () => m.getCanvas().style.cursor = 'pointer');
-            m.on('mouseleave', '3d-buildings', () => m.getCanvas().style.cursor = '');
+            // POINTER CURSOR LOGIC
+            // We use 'mousemove' instead of 'mouseenter' for smoother mobile response
+            m.on('mousemove', '3d-buildings', (e) => {
+                if (e.features && e.features.length > 0) {
+                    m.getCanvas().style.cursor = 'pointer';
+                }
+            });
+            m.on('mouseleave', '3d-buildings', () => {
+                m.getCanvas().style.cursor = '';
+            });
         });
 
     }, [resolvedTheme]);
 
-    // 2. LIVE FILTERING EFFECT
+    // 2. LIVE FILTERING
     useEffect(() => {
         if (!map.current || !map.current.getLayer('3d-buildings')) return;
         const filter: any = ['any', ['==', 'type', 'standard'], ['in', 'type', ...activeLayers]];
         map.current.setFilter('3d-buildings', filter);
     }, [activeLayers]);
 
-    // 3. TARGET LOCATION FLYTO (The New Logic)
+    // 3. TARGET LOCATION
     useEffect(() => {
         if (!map.current || !targetLocation) return;
 
         map.current.flyTo({
-            center: [targetLocation[1], targetLocation[0]], // MapLibre takes [lng, lat]
+            center: [targetLocation[1], targetLocation[0]],
             zoom: 16,
             pitch: 50,
             duration: 2000
@@ -255,9 +261,14 @@ export default function RealMap({ activeLayers, targetLocation }: RealMapProps) 
 
     return (
         <div className="relative w-full h-full bg-neutral-100 dark:bg-neutral-900 rounded-[2rem] overflow-hidden border border-neutral-300 dark:border-neutral-800 transition-colors duration-500">
-            <div ref={mapContainer} className="w-full h-full" />
-
-            {/* SEARCH OVERLAY IS HANDLED IN PAGE.TSX NOW */}
+            {/* CRITICAL FIX FOR MOBILE:
+               touch-action: none -> Prevents browser scrolling when you drag the map
+            */}
+            <div
+                ref={mapContainer}
+                className="w-full h-full"
+                style={{ touchAction: "none" }}
+            />
 
             <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-10">
                 <button onClick={handleReset} className="bg-white dark:bg-neutral-800 p-3 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition"><Navigation className="w-5 h-5" /></button>

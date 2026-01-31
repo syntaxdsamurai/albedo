@@ -14,10 +14,9 @@ import ThemeToggle from "@/components/ThemeToggle";
 export default function Home() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeLayers, setActiveLayers] = useState<string[]>(["roof", "parking", "garden"]);
-    const [isMobile, setIsMobile] = useState(false);
+    const [isMobile, setIsMobile] = useState(true); // Default to true to prevent hydration mismatch flicker
 
     // --- DETECT MOBILE ---
-    // We disable heavy animations on mobile to prevent flickering
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
         checkMobile();
@@ -34,17 +33,15 @@ export default function Home() {
     // --- SCROLL ANIMATION LOGIC ---
     const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
 
-    // 1. Map Animations (DESKTOP ONLY)
-    // On mobile, we force these values to remain static
+    // DESKTOP ANIMATIONS ONLY
     const mapScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95]);
     const mapY = useTransform(scrollYProgress, [0, 0.15], ["0%", "5%"]);
     const mapRadius = useTransform(scrollYProgress, [0, 0.15], ["0px", "40px"]);
     const mapOpacity = useTransform(scrollYProgress, [0.15, 0.25], [1, 0.5]);
 
-    // 2. Dashboard Animations
+    // DASHBOARD ANIMATIONS
     const dashboardOpacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
     const dashboardY = useTransform(scrollYProgress, [0, 0.15], [0, 50]);
-
     const [pointerEvents, setPointerEvents] = useState<"auto" | "none">("auto");
 
     useEffect(() => {
@@ -60,24 +57,29 @@ export default function Home() {
             <ThemeToggle />
 
             {/* 1. MAP BACKGROUND */}
-            <div className="fixed top-0 left-0 w-full h-[100dvh] z-0 flex items-start justify-center pt-0 md:pt-2 overflow-hidden pointer-events-none touch-none">
-                <motion.div
-                    // MOBILE FIX: If mobile, use static values. If desktop, use animated values.
-                    style={{
-                        scale: isMobile ? 1 : mapScale,
-                        y: isMobile ? "0%" : mapY,
-                        borderRadius: isMobile ? "0px" : mapRadius,
-                        opacity: isMobile ? 1 : mapOpacity
-                    }}
-                    className="w-full h-full md:w-[98%] md:h-[95%] relative shadow-2xl overflow-hidden bg-white dark:bg-neutral-900 pointer-events-auto transition-colors duration-500"
-                >
-                    <RealMap activeLayers={activeLayers} />
-                </motion.div>
+            {/* FIX: 'fixed inset-0' locks all 4 corners. 'z-0' keeps it behind. */}
+            <div className="fixed inset-0 w-full h-full z-0 flex items-start justify-center pt-0 md:pt-2 overflow-hidden pointer-events-none touch-none">
+
+                {isMobile ? (
+                    // --- MOBILE VERSION (Static, No Motion) ---
+                    // This is a plain div. It cannot flicker because it has no animation logic attached.
+                    <div className="w-full h-full relative shadow-none overflow-hidden bg-white dark:bg-neutral-900 pointer-events-auto transition-colors duration-500">
+                        <RealMap activeLayers={activeLayers} />
+                    </div>
+                ) : (
+                    // --- DESKTOP VERSION (Animated) ---
+                    <motion.div
+                        style={{ scale: mapScale, y: mapY, borderRadius: mapRadius, opacity: mapOpacity }}
+                        className="w-[98%] h-[95%] relative shadow-2xl overflow-hidden bg-white dark:bg-neutral-900 pointer-events-auto transition-colors duration-500"
+                    >
+                        <RealMap activeLayers={activeLayers} />
+                    </motion.div>
+                )}
             </div>
 
             {/* SPACER */}
-            {/* On mobile, we give the map a full screen height before content starts */}
-            <div className="h-[100dvh] w-full relative z-10 pointer-events-none" />
+            {/* Use 100svh (Small Viewport Height) to respect mobile address bars properly */}
+            <div className="h-[100svh] w-full relative z-10 pointer-events-none" />
 
             {/* 2. MAIN CONTENT STACK */}
             <div className="relative z-20 w-full flex flex-col items-center">
